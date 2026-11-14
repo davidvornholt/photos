@@ -3,15 +3,16 @@ import { Argument, Command } from 'effect/cli';
 import {
   AlbumListSchema,
   AlbumSchema,
-  BulkResultSchema,
+  getAlbum,
   matchesName,
-  splitResults,
   summarizeAlbum,
 } from '../features/albums/albums.ts';
 import { AssetPageSchema } from '../features/assets/assets.ts';
 import { maxPage, searchAssets } from '../features/assets/library.ts';
 import { searchRequest } from '../features/assets/search.ts';
+import { BulkResultSchema, splitResults } from '../shared/bulk.ts';
 import { requestJson, requestNothing } from '../shared/immich.ts';
+import { share, unshare } from './album-share-commands.ts';
 import {
   fail,
   idArgument,
@@ -25,9 +26,6 @@ import {
 import { runImmich } from './root.ts';
 
 const albumPageDefault = 100;
-
-const getAlbum = (id: string) =>
-  requestJson({ method: 'GET', path: `/albums/${id}` }, AlbumSchema);
 
 const albumName = (value: string) => {
   const name = value.trim();
@@ -259,7 +257,9 @@ const deleteAlbum = Command.make(
 );
 
 export const albums = Command.make('albums').pipe(
-  Command.withDescription('List, look at, create, change and delete albums'),
+  Command.withDescription(
+    'List, look at, create, change, share and delete albums',
+  ),
   Command.withSubcommands([
     list,
     show,
@@ -268,5 +268,7 @@ export const albums = Command.make('albums').pipe(
     add,
     remove,
     deleteAlbum,
+    share,
+    unshare,
   ]),
 );

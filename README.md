@@ -2,9 +2,9 @@
 
 > Built on [davidvornholt/standards](https://github.com/davidvornholt/standards).
 
-`photos` is a command-line tool for AI agents to find, look at, download, and tidy the photos and videos in an [Immich](https://immich.app) library. An agent can find the photos you just took on your phone and look at them without you downloading anything, search by what photos show or the text in them, sort photos into albums, and move temporary scans or duplicates to the trash. It talks to Immich's REST API with an API key and prints JSON.
+`photos` is a command-line tool for AI agents to find, look at, download, upload, organize, and share the photos and videos in an [Immich](https://immich.app) library. An agent can find the photos you just took on your phone and look at them without you downloading anything, search by what photos show, the text in them, or the people in them, sort photos into albums, tags, stacks, and memories, name people and fix their faces, crop and rotate photos, share albums and links, and move temporary scans or duplicates to the trash. It talks to Immich's REST API with an API key and prints JSON.
 
-photos can't delete anything for good. Deleting moves photos to Immich's trash, which keeps them for 30 days by default, and `photos restore` brings them back. It never prints GPS coordinates, and the previews it saves for an agent to look at are Immich's re-encoded thumbnails without camera metadata.
+photos can't delete photos or videos for good. Deleting moves them to Immich's trash, which keeps them for 30 days by default, and `photos restore` brings them back. It never prints GPS coordinates, and the previews it saves for an agent to look at are Immich's re-encoded thumbnails without camera metadata. Shared links expire after 7 days and show no metadata and allow no downloads unless asked.
 
 ## Install
 
@@ -21,14 +21,19 @@ Where [just](https://just.systems) is installed, `just install` runs the second 
 
 ## Sign in
 
-In Immich, open Account Settings > API Keys and create a key for each machine with these permissions:
+In Immich, open Account Settings > API Keys and create a key with these permissions:
 
-- `asset.read`, `asset.view`, `asset.download`, `asset.update`, `asset.delete`
-- `album.read`, `album.create`, `album.update`, `album.delete`
-- `albumAsset.create`, `albumAsset.delete`
-- `duplicate.read`, `user.read`
+- `asset.read`, `asset.view`, `asset.download`, `asset.update`, `asset.delete`, `asset.upload`, `asset.copy`, `asset.statistics`, `asset.edit.get`, `asset.edit.create`, `asset.edit.delete`
+- `album.read`, `album.create`, `album.update`, `album.delete`, `album.statistics`, `albumAsset.create`, `albumAsset.delete`, `albumUser.create`, `albumUser.update`, `albumUser.delete`
+- `duplicate.read`, `duplicate.delete`
+- `person.read`, `person.create`, `person.update`, `person.merge`, `person.delete`, `person.statistics`, `face.read`, `face.create`, `face.update`, `face.delete`
+- `tag.read`, `tag.create`, `tag.update`, `tag.delete`, `tag.asset`
+- `stack.read`, `stack.create`, `stack.update`, `stack.delete`
+- `memory.read`, `memory.create`, `memory.update`, `memory.delete`, `memory.statistics`, `memoryAsset.create`, `memoryAsset.delete`
+- `sharedLink.read`, `sharedLink.create`, `sharedLink.update`, `sharedLink.delete`
+- `folder.read`, `user.read`
 
-Then store it on the machine:
+A key with fewer works for the commands it covers. Then store it on each machine:
 
 ```bash
 photos login --server https://immich.example.com
@@ -38,7 +43,7 @@ photos asks for the key without showing it, or reads it from stdin (`photos logi
 
 ## Use
 
-Run `photos --help` for the commands and `photos <command> --help` for their options. The skill in [`apps/cli/skills/photos`](apps/cli/skills/photos/SKILL.md) tells agents how to use them, including that they show you what they picked and wait for your OK before they move anything to the trash.
+Run `photos --help` for the commands and `photos <command> --help` for their options. The skill in [`apps/cli/skills/photos`](apps/cli/skills/photos/SKILL.md) tells agents how to use them, including that they show you what they picked and wait for your OK before they move anything to the trash, delete or merge anything, or share anything.
 
 ## Develop
 

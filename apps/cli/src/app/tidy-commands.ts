@@ -4,12 +4,8 @@ import {
   FeaturesSchema,
   ServerConfigSchema,
 } from '../features/account/account.ts';
-import {
-  CountSchema,
-  DuplicatesSchema,
-  summarize,
-} from '../features/assets/assets.ts';
-import { browsable, getAssets, maxPage } from '../features/assets/library.ts';
+import { CountSchema, summarize } from '../features/assets/assets.ts';
+import { browsable, getAssets } from '../features/assets/library.ts';
 import { TrashDisabled } from '../shared/errors/errors.ts';
 import { requestJson, requestNothing } from '../shared/immich.ts';
 import {
@@ -19,13 +15,36 @@ import {
   idsArgument,
   optionalInt,
   optionalString,
-  pageSize,
   validIds,
 } from './command-inputs.ts';
 import { runImmich } from './root.ts';
 
-const duplicatesDefault = 20;
 const maxRating = 5;
+
+/**
+ * Immich's trash settings, or a failure while the trash is off: then Immich
+ * deletes for good what it is asked to delete, and photos never deletes for
+ * good. Every command that moves photos to the trash checks this first.
+ */
+export const requireTrash = Effect.gen(function* () {
+  const [features, config] = yield* Effect.all(
+    [
+      requestJson({ method: 'GET', path: '/server/features' }, FeaturesSchema),
+      requestJson(
+        { method: 'GET', path: '/server/config' },
+        ServerConfigSchema,
+      ),
+    ],
+    { concurrency: 'unbounded' },
+  );
+  if (!features.trash) {
+    return yield* new TrashDisabled({
+      message:
+        "Immich's trash is turned off, so deleting would remove the photos for good. photos only moves photos to the trash; turn the trash back on in Immich's settings first.",
+    });
+  }
+  return { trashDays: config.trashDays };
+});
 
 export const trash = Command.make(
   'trash',
@@ -33,27 +52,7 @@ export const trash = Command.make(
   ({ ids }) =>
     runImmich(validIds(ids), (valid) =>
       Effect.gen(function* () {
-        const [features, config] = yield* Effect.all(
-          [
-            requestJson(
-              { method: 'GET', path: '/server/features' },
-              FeaturesSchema,
-            ),
-            requestJson(
-              { method: 'GET', path: '/server/config' },
-              ServerConfigSchema,
-            ),
-          ],
-          { concurrency: 'unbounded' },
-        );
-        // Without the trash, Immich deletes for good what it is asked to
-        // delete, and photos never deletes for good.
-        if (!features.trash) {
-          return yield* new TrashDisabled({
-            message:
-              "Immich's trash is turned off, so deleting would remove the photos for good. photos only moves photos to the trash; turn the trash back on in Immich's settings first.",
-          });
-        }
+        const { trashDays } = yield* requireTrash;
         const assets = yield* getAssets(valid).pipe(Effect.flatMap(browsable));
         const toTrash = assets.filter((asset) => !asset.isTrashed);
         if (toTrash.length > 0) {
@@ -70,7 +69,7 @@ export const trash = Command.make(
           alreadyInTrash: assets
             .filter((asset) => asset.isTrashed)
             .map(({ id }) => id),
-          trashDays: config.trashDays,
+          trashDays,
           restoreWith: `photos restore ${valid.join(' ')}`,
         };
       }),
@@ -183,35 +182,5 @@ export const update = Command.make(
 ).pipe(
   Command.withDescription(
     'Change the favorite mark, archive, description or rating of photos. Prints them as they are now.',
-  ),
-);
-
-export const duplicates = Command.make(
-  'duplicates',
-  {
-    limit: optionalInt(
-      'limit',
-      `How many groups (default ${duplicatesDefault}, at most ${maxPage})`,
-    ),
-  },
-  ({ limit }) =>
-    runImmich(pageSize(limit, duplicatesDefault), (chosen) =>
-      requestJson(
-        { method: 'GET', path: '/duplicates' },
-        DuplicatesSchema,
-      ).pipe(
-        Effect.map((groups) => ({
-          groups: groups.length,
-          duplicates: groups.slice(0, chosen).map((group) => ({
-            duplicateId: group.duplicateId,
-            keep: group.suggestedKeepAssetIds,
-            assets: group.assets.map(summarize),
-          })),
-        })),
-      ),
-    ),
-).pipe(
-  Command.withDescription(
-    'List groups of photos Immich found to look alike, with the ones it suggests keeping',
   ),
 );

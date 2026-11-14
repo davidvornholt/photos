@@ -2,7 +2,7 @@ import { lstat } from 'node:fs/promises';
 import process from 'node:process';
 import { Config, Effect, FileSystem, Option, Path, Stream } from 'effect';
 import { FileNotSaved } from '../../shared/errors/errors.ts';
-import { Immich } from '../../shared/immich.ts';
+import { Immich, type ImmichRequest } from '../../shared/immich.ts';
 import type { Asset } from './assets.ts';
 
 export const previewSizes = ['preview', 'thumbnail'] as const;
@@ -121,34 +121,30 @@ const extensionFor = (contentType: string | undefined) => {
 };
 
 /**
- * Saves the preview Immich renders of a photo or video and returns its
- * absolute path. Previews are re-encoded by Immich, so they are small and
- * carry no camera metadata.
+ * Saves an image Immich renders into the previews directory under `name`,
+ * with the extension its type calls for, and returns its absolute path.
  */
-export const savePreview = Effect.fn('savePreview')(function* (
-  id: string,
-  size: PreviewSize,
+const saveImage = Effect.fn('saveImage')(function* (
+  request: ImmichRequest,
+  what: string,
+  name: string,
 ) {
   const { execute, server } = yield* Immich;
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
-  const response = yield* execute({
-    method: 'GET',
-    path: `/assets/${id}/thumbnail`,
-    query: { size },
-  });
+  const response = yield* execute(request);
   const bytes = yield* response.arrayBuffer.pipe(
     Effect.mapError(
       (error) =>
         new FileNotSaved({
-          message: `${server} broke off the preview of ${id}: ${error.message}`,
+          message: `${server} broke off ${what}: ${error.message}`,
         }),
     ),
   );
   const directory = yield* previewsDirectory;
   const file = path.join(
     directory,
-    `${id}-${size}.${extensionFor(response.headers['content-type'])}`,
+    `${name}.${extensionFor(response.headers['content-type'])}`,
   );
   // Written as a new file beside the final name and renamed, so a broken
   // download never poses as a preview, and a link at the final name is
@@ -166,6 +162,29 @@ export const savePreview = Effect.fn('savePreview')(function* (
   );
   return file;
 });
+
+/**
+ * Saves the preview Immich renders of a photo or video and returns its
+ * absolute path. Previews are re-encoded by Immich, so they are small and
+ * carry no camera metadata.
+ */
+export const savePreview = (id: string, size: PreviewSize) =>
+  saveImage(
+    { method: 'GET', path: `/assets/${id}/thumbnail`, query: { size } },
+    `the preview of ${id}`,
+    `${id}-${size}`,
+  );
+
+/**
+ * Saves the picture of a person's face that Immich shows for them, beside
+ * the previews, and returns its absolute path.
+ */
+export const saveFace = (personId: string) =>
+  saveImage(
+    { method: 'GET', path: `/people/${personId}/thumbnail` },
+    `the face of ${personId}`,
+    `${personId}-face`,
+  );
 
 // Characters no file name should carry: path separators and control codes.
 const unsafeCharacters = /[/\\\p{Cc}]/gu;

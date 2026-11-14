@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 import { mkdir, readFile, rm, stat } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
+import { requiredPermissions } from '../features/account/account.ts';
 import {
   apiKey,
   credentialsPath,
@@ -97,7 +98,9 @@ describe('photos status', () => {
       'GET /api/api-keys/me': {
         id: id(80),
         name: 'reader',
-        permissions: ['asset.read', 'asset.view', 'album.read'],
+        permissions: requiredPermissions.filter(
+          (permission) => !['tag.asset', 'user.read'].includes(permission),
+        ),
       },
       'GET /api/users/me': () =>
         Response.json(
@@ -110,18 +113,7 @@ describe('photos status', () => {
     });
     const output = await runOk('status');
     expect(output.user).toBeNull();
-    expect(output.missingPermissions).toEqual([
-      'asset.download',
-      'asset.update',
-      'asset.delete',
-      'album.create',
-      'album.update',
-      'album.delete',
-      'albumAsset.create',
-      'albumAsset.delete',
-      'duplicate.read',
-      'user.read',
-    ]);
+    expect(output.missingPermissions).toEqual(['tag.asset', 'user.read']);
   });
 
   it('says so when this machine has no key', async () => {
@@ -168,7 +160,7 @@ describe('answers from Immich', () => {
           { status: 403 },
         ),
     });
-    const failure = await failureOf('duplicates');
+    const failure = await failureOf('duplicates', 'list');
     expect(failure._tag).toBe('MissingPermission');
     expect(failure.message).toStartWith(
       'Missing required permission: duplicate.read.',
@@ -180,7 +172,7 @@ describe('answers from Immich', () => {
       'GET /api/duplicates': () =>
         Response.redirect('https://elsewhere.example', 302),
     });
-    const failure = await failureOf('duplicates');
+    const failure = await failureOf('duplicates', 'list');
     expect(failure._tag).toBe('UnexpectedResponse');
     expect(failure.message).toContain('https://elsewhere.example');
     expect(fake.sent).toHaveLength(1);

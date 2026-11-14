@@ -38,6 +38,21 @@ export const AssetSchema = Schema.Struct({
   visibility: Schema.String,
   duplicateId: nullable(Schema.String),
   exifInfo: Schema.optional(ExifSchema),
+  // The lookup of one asset carries these three; search results may not.
+  people: Schema.optional(
+    Schema.Array(Schema.Struct({ id: Schema.String, name: Schema.String })),
+  ),
+  // `value` is the tag's full path, such as Travel/Italy.
+  tags: Schema.optional(
+    Schema.Array(Schema.Struct({ id: Schema.String, value: Schema.String })),
+  ),
+  stack: nullable(
+    Schema.Struct({
+      id: Schema.String,
+      primaryAssetId: Schema.String,
+      assetCount: Schema.Number,
+    }),
+  ),
 });
 export type Asset = typeof AssetSchema.Type;
 
@@ -145,6 +160,19 @@ export const describeAsset = (
     timeZone: text(exif?.timeZone),
     rating: exif?.rating ?? null,
     albums,
+    people: (asset.people ?? []).map((person) => ({
+      id: person.id,
+      name: text(person.name),
+    })),
+    tags: (asset.tags ?? []).map((tag) => ({ id: tag.id, name: tag.value })),
+    stack:
+      asset.stack === undefined || asset.stack === null
+        ? null
+        : {
+            id: asset.stack.id,
+            primaryAssetId: asset.stack.primaryAssetId,
+            count: asset.stack.assetCount,
+          },
     text: lines.length === 0 ? null : lines.join('\n'),
   };
 };

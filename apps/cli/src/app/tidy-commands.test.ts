@@ -150,32 +150,3 @@ describe('photos update', () => {
     expect(fake.sent).toEqual([]);
   });
 });
-
-describe('photos duplicates', () => {
-  it('lists look-alike groups with the ones to keep', async () => {
-    respond({
-      'GET /api/duplicates': [
-        {
-          duplicateId: id(70),
-          assets: [asset(id(1)), asset(id(2))],
-          suggestedKeepAssetIds: [id(1)],
-        },
-        { duplicateId: id(71), assets: [], suggestedKeepAssetIds: [] },
-      ],
-    });
-    const output = await runOk('duplicates', '--limit', '1');
-    expect(output).toEqual({
-      groups: 2,
-      duplicates: [
-        {
-          duplicateId: id(70),
-          keep: [id(1)],
-          assets: [
-            expect.objectContaining({ id: id(1) }),
-            expect.objectContaining({ id: id(2) }),
-          ],
-        },
-      ],
-    });
-  });
-});

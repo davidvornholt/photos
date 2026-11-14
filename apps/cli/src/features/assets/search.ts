@@ -17,6 +17,10 @@ export type AssetQuery = {
   readonly type?: 'IMAGE' | 'VIDEO';
   readonly albumId?: string;
   readonly withoutAlbum?: boolean;
+  /** Only photos that show every one of these people. */
+  readonly personIds?: ReadonlyArray<string>;
+  /** Only photos with every one of these tags, or a tag below each. */
+  readonly tagIds?: ReadonlyArray<string>;
   /** Only favorites when true, only the rest when false. */
   readonly favorite?: boolean;
   /** Only archived photos when true, only the timeline when false. */
@@ -35,6 +39,9 @@ const range = (from: string | undefined, to: string | undefined) =>
         ...(from === undefined ? {} : { gte: from }),
         ...(to === undefined ? {} : { lte: to }),
       };
+
+const allOf = (ids: ReadonlyArray<string> | undefined) =>
+  ids === undefined || ids.length === 0 ? undefined : { all: ids };
 
 const visibility = (archived: boolean | undefined) => {
   if (archived === undefined) {
@@ -76,6 +83,8 @@ export const searchFilter = (query: AssetQuery) => {
     query.albumId === undefined ? undefined : { any: [query.albumId] },
   );
   set('hasAlbums', query.withoutAlbum === true ? { eq: false } : undefined);
+  set('personIds', allOf(query.personIds));
+  set('tagIds', allOf(query.tagIds));
   set(
     'isFavorite',
     query.favorite === undefined ? undefined : { eq: query.favorite },
