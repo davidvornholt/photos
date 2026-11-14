@@ -4,12 +4,8 @@ import {
   FeaturesSchema,
   ServerConfigSchema,
 } from '../features/account/account.ts';
-import {
-  CountSchema,
-  DuplicatesSchema,
-  summarize,
-} from '../features/assets/assets.ts';
-import { browsable, getAssets, maxPage } from '../features/assets/library.ts';
+import { CountSchema, summarize } from '../features/assets/assets.ts';
+import { browsable, getAssets } from '../features/assets/library.ts';
 import { TrashDisabled } from '../shared/errors/errors.ts';
 import { requestJson, requestNothing } from '../shared/immich.ts';
 import {
@@ -19,12 +15,10 @@ import {
   idsArgument,
   optionalInt,
   optionalString,
-  pageSize,
   validIds,
 } from './command-inputs.ts';
 import { runImmich } from './root.ts';
 
-const duplicatesDefault = 20;
 const maxRating = 5;
 
 export const trash = Command.make(
@@ -183,35 +177,5 @@ export const update = Command.make(
 ).pipe(
   Command.withDescription(
     'Change the favorite mark, archive, description or rating of photos. Prints them as they are now.',
-  ),
-);
-
-export const duplicates = Command.make(
-  'duplicates',
-  {
-    limit: optionalInt(
-      'limit',
-      `How many groups (default ${duplicatesDefault}, at most ${maxPage})`,
-    ),
-  },
-  ({ limit }) =>
-    runImmich(pageSize(limit, duplicatesDefault), (chosen) =>
-      requestJson(
-        { method: 'GET', path: '/duplicates' },
-        DuplicatesSchema,
-      ).pipe(
-        Effect.map((groups) => ({
-          groups: groups.length,
-          duplicates: groups.slice(0, chosen).map((group) => ({
-            duplicateId: group.duplicateId,
-            keep: group.suggestedKeepAssetIds,
-            assets: group.assets.map(summarize),
-          })),
-        })),
-      ),
-    ),
-).pipe(
-  Command.withDescription(
-    'List groups of photos Immich found to look alike, with the ones it suggests keeping',
   ),
 );

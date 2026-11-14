@@ -6,9 +6,19 @@ import packageJson from '../../package.json' with { type: 'json' };
 import { login, logout, status } from './account-commands.ts';
 import { albums } from './album-commands.ts';
 import { download, preview, recent, search, show } from './asset-commands.ts';
+import { duplicates } from './duplicate-commands.ts';
+import { edits } from './edit-commands.ts';
+import { faces } from './face-commands.ts';
+import { folders, stats, users } from './library-commands.ts';
+import { links } from './link-commands.ts';
+import { memories } from './memory-commands.ts';
 import { report } from './output.ts';
+import { people } from './people-commands.ts';
 import { root } from './root.ts';
-import { duplicates, restore, trash, update } from './tidy-commands.ts';
+import { stacks } from './stack-commands.ts';
+import { tags } from './tag-commands.ts';
+import { restore, trash, update } from './tidy-commands.ts';
+import { copyInfo, upload } from './upload-commands.ts';
 
 export const photos = root.pipe(
   Command.withSubcommands([
@@ -25,6 +35,18 @@ export const photos = root.pipe(
     restore,
     duplicates,
     albums,
+    stacks,
+    tags,
+    people,
+    faces,
+    memories,
+    links,
+    upload,
+    copyInfo,
+    edits,
+    stats,
+    folders,
+    users,
   ]),
 );
 
