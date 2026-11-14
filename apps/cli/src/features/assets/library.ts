@@ -1,4 +1,4 @@
-import { Effect } from 'effect';
+import { Effect, Schema } from 'effect';
 import { InvalidInput } from '../../shared/errors/errors.ts';
 import { requestJson } from '../../shared/immich.ts';
 import {
@@ -9,6 +9,22 @@ import {
   summarize,
 } from './assets.ts';
 import { type AssetQuery, searchRequest } from './search.ts';
+
+/** How many photos and videos match, and everything together. */
+export const AssetCountsSchema = Schema.Struct({
+  images: Schema.Number,
+  videos: Schema.Number,
+  total: Schema.Number,
+});
+
+/** How many people Immich recognized, and how many of them are hidden. */
+export const PeopleCountsSchema = Schema.Struct({
+  total: Schema.Number,
+  hidden: Schema.Number,
+});
+
+/** The folders on the server that hold photos, without a trailing slash. */
+export const FolderPathsSchema = Schema.Array(Schema.String);
 
 /** The most results Immich returns for one search request. */
 export const maxPage = 1000;

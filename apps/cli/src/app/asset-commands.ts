@@ -47,6 +47,10 @@ const optionalText = (value: Option.Option<string>) =>
     ),
   );
 
+/** A flag that may be given several times, each with an id. */
+const repeatedIds = (name: string, description: string) =>
+  Flag.String(name).pipe(Flag.withDescription(description), Flag.atLeast(0));
+
 const timeHelp =
   'an age such as 30m, 2h, 3d or 1w; a day as YYYY-MM-DD; or a time';
 
@@ -102,6 +106,14 @@ export const search = Command.make(
     ),
     album: optionalString('album', 'Only what is in this album (album id)'),
     withoutAlbum: flag('without-album', 'Only what is in no album'),
+    person: repeatedIds(
+      'person',
+      'Only photos that show this person (person id from `photos people list`). Repeat it for photos that show all of them.',
+    ),
+    tag: repeatedIds(
+      'tag',
+      'Only photos with this tag or a tag below it (tag id). Repeat it for photos that have all of them.',
+    ),
     favorite: choice(
       'favorite',
       'Only favorites, or with --no-favorite only the rest',
@@ -147,6 +159,8 @@ export const search = Command.make(
             ? yield* validId(flags.album.value)
             : undefined,
           withoutAlbum: flags.withoutAlbum,
+          personIds: yield* validIds(flags.person),
+          tagIds: yield* validIds(flags.tag),
           favorite: Option.getOrUndefined(flags.favorite),
           archived: Option.getOrUndefined(flags.archived),
           trashed: flags.trashed,
@@ -173,7 +187,7 @@ export const search = Command.make(
     ),
 ).pipe(
   Command.withDescription(
-    'Search the library by what photos show, text in them, file name, description, time taken or uploaded, type, album and flags. Without --query, newest taken first, in pages.',
+    'Search the library by what photos show, text in them, file name, description, time taken or uploaded, type, album, people, tags and flags. Without --query, newest taken first, in pages.',
   ),
 );
 
@@ -211,7 +225,7 @@ export const show = Command.make(
     ),
 ).pipe(
   Command.withDescription(
-    'Show everything about photos: when and where they were taken (place name, never coordinates), camera, size, rating, description, albums, and the text Immich read in them',
+    'Show everything about photos: when and where they were taken (place name, never coordinates), camera, size, rating, description, albums, the people Immich recognized in them, tags, the stack they belong to, and the text Immich read in them',
   ),
 );
 

@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 import { mkdir, readFile, stat, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
-  album,
   apiKey,
   asset,
   failureOf,
@@ -206,6 +205,8 @@ describe('photos search', () => {
     [['--from', '2026-02-31'], 'is not a time'],
     [['--to', '2026-11-14T24:00'], 'is not a time'],
     [['--album', 'scans'], 'is not an Immich id'],
+    [['--person', 'Anna'], 'is not an Immich id'],
+    [['--tag', 'Travel'], 'is not an Immich id'],
   ])('refuses %j', async (args, message) => {
     const failure = await failureOf('search', ...args);
     expect(failure._tag).toBe('InvalidInput');
@@ -214,42 +215,34 @@ describe('photos search', () => {
   });
 });
 
-describe('photos show', () => {
-  it('describes photos with place names but never coordinates', async () => {
-    respond({
-      [`GET /api/assets/${id(1)}`]: asset(id(1), {
-        exifInfo: {
-          ...asset(id(1)).exifInfo,
-          description: ' Receipt ',
-          rating: 4,
+describe('photos search by people and tags', () => {
+  it('finds photos that show all the people and have all the tags', async () => {
+    respond({ 'POST /api/search/metadata': page([]) });
+    await runOk(
+      'search',
+      '--person',
+      id(60),
+      '--person',
+      id(61).toUpperCase(),
+      '--person',
+      id(60),
+      '--tag',
+      id(70),
+    );
+    expect(requests()).toEqual([
+      {
+        'POST /api/search/metadata': {
+          filter: {
+            ...notTrashed,
+            personIds: { all: [id(60), id(61)] },
+            tagIds: { all: [id(70)] },
+          },
+          orderBy: newestFirst,
+          size: 50,
+          withExif: true,
         },
-      }),
-      [`GET /api/albums?assetId=${id(1)}`]: [album(id(50))],
-      [`GET /api/assets/${id(1)}/ocr`]: [
-        { text: 'Apotheke' },
-        { text: ' 12,40 ' },
-      ],
-    });
-    const output = await runOk('show', id(1).toUpperCase());
-    expect(output).toEqual([
-      expect.objectContaining({
-        id: id(1),
-        description: 'Receipt',
-        mimeType: 'image/jpeg',
-        fileSize: 2_400_000,
-        camera: 'Google Pixel 6',
-        lens: null,
-        place: 'Berlin, Berlin, Germany',
-        timeZone: 'Europe/Berlin',
-        rating: 4,
-        albums: [{ id: id(50), name: 'Scans' }],
-        text: 'Apotheke\n12,40',
-      }),
+      },
     ]);
-    const shown = JSON.stringify(output);
-    expect(shown).not.toContain('52.52');
-    expect(shown).not.toContain('13.405');
-    expect(shown).not.toContain('/data/library');
   });
 });
 

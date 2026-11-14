@@ -32,8 +32,18 @@ export type ImmichRequest = {
   /** Below `/api`, such as `/assets/{id}`. */
   readonly path: string;
   readonly query?: Readonly<Record<string, string | undefined>>;
-  readonly body?: unknown;
-};
+} & (
+  | {
+      /** Sent as JSON. */
+      readonly body?: unknown;
+      readonly form?: undefined;
+    }
+  | {
+      /** Sent as multipart form data, as an upload is. */
+      readonly form: FormData;
+      readonly body?: undefined;
+    }
+);
 
 /** The Immich API, signed in with this machine's key. */
 export class Immich extends Context.Service<
@@ -144,6 +154,18 @@ const unreachable =
         })
       : unexpected(server, error.message);
 
+const outgoingBody = (
+  base: HttpClientRequest.HttpClientRequest,
+  request: ImmichRequest,
+) => {
+  if (request.form !== undefined) {
+    return HttpClientRequest.bodyFormData(base, request.form);
+  }
+  return request.body === undefined
+    ? base
+    : HttpClientRequest.bodyJsonUnsafe(base, request.body);
+};
+
 /** The API of one server with one key, for checking a key before it is saved. */
 export const makeImmich = (credentials: Credentials) =>
   Effect.gen(function* () {
@@ -167,10 +189,7 @@ export const makeImmich = (credentials: Credentials) =>
       const base = HttpClientRequest.make(request.method)(request.path, {
         urlParams,
       });
-      const outgoing =
-        request.body === undefined
-          ? base
-          : HttpClientRequest.bodyJsonUnsafe(base, request.body);
+      const outgoing = outgoingBody(base, request);
       const response = yield* client
         .execute(outgoing)
         .pipe(Effect.mapError(unreachable(server)));

@@ -39,6 +39,7 @@ describe('photos albums list and show', () => {
         assetCount: 2,
         owner: 'Owner',
         shared: false,
+        sharedWith: [],
         sharedLink: false,
         coverAssetId: id(1),
         firstTakenOn: '2026-11-01',

@@ -21,33 +21,38 @@ import { runImmich } from './root.ts';
 
 const maxRating = 5;
 
+/**
+ * Immich's trash settings, or a failure while the trash is off: then Immich
+ * deletes for good what it is asked to delete, and photos never deletes for
+ * good. Every command that moves photos to the trash checks this first.
+ */
+export const requireTrash = Effect.gen(function* () {
+  const [features, config] = yield* Effect.all(
+    [
+      requestJson({ method: 'GET', path: '/server/features' }, FeaturesSchema),
+      requestJson(
+        { method: 'GET', path: '/server/config' },
+        ServerConfigSchema,
+      ),
+    ],
+    { concurrency: 'unbounded' },
+  );
+  if (!features.trash) {
+    return yield* new TrashDisabled({
+      message:
+        "Immich's trash is turned off, so deleting would remove the photos for good. photos only moves photos to the trash; turn the trash back on in Immich's settings first.",
+    });
+  }
+  return { trashDays: config.trashDays };
+});
+
 export const trash = Command.make(
   'trash',
   { ids: idsArgument('id', 'Asset ids') },
   ({ ids }) =>
     runImmich(validIds(ids), (valid) =>
       Effect.gen(function* () {
-        const [features, config] = yield* Effect.all(
-          [
-            requestJson(
-              { method: 'GET', path: '/server/features' },
-              FeaturesSchema,
-            ),
-            requestJson(
-              { method: 'GET', path: '/server/config' },
-              ServerConfigSchema,
-            ),
-          ],
-          { concurrency: 'unbounded' },
-        );
-        // Without the trash, Immich deletes for good what it is asked to
-        // delete, and photos never deletes for good.
-        if (!features.trash) {
-          return yield* new TrashDisabled({
-            message:
-              "Immich's trash is turned off, so deleting would remove the photos for good. photos only moves photos to the trash; turn the trash back on in Immich's settings first.",
-          });
-        }
+        const { trashDays } = yield* requireTrash;
         const assets = yield* getAssets(valid).pipe(Effect.flatMap(browsable));
         const toTrash = assets.filter((asset) => !asset.isTrashed);
         if (toTrash.length > 0) {
@@ -64,7 +69,7 @@ export const trash = Command.make(
           alreadyInTrash: assets
             .filter((asset) => asset.isTrashed)
             .map(({ id }) => id),
-          trashDays: config.trashDays,
+          trashDays,
           restoreWith: `photos restore ${valid.join(' ')}`,
         };
       }),
