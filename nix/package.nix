@@ -8,21 +8,8 @@
 }:
 let
   pname = "photos";
-  # The repository without dependencies, build output, and local state, which a
-  # dirty checkout or a path: flake would otherwise copy into the store.
-  # lib.fileset can't exclude a directory by name at any depth, so this filters
-  # the source by name instead.
-  src = lib.cleanSourceWith {
-    src = lib.cleanSource ../.;
-    filter =
-      path: _type:
-      !builtins.elem (baseNameOf path) [
-        ".direnv"
-        ".turbo"
-        "dist"
-        "node_modules"
-      ];
-  };
+  # The files git doesn't ignore; package-source.nix says what that protects.
+  src = import ./package-source.nix { inherit lib; } ../.;
   skills = builtins.attrNames (
     lib.filterAttrs (_name: type: type == "directory") (builtins.readDir ../apps/cli/skills)
   );
@@ -52,7 +39,7 @@ let
     # A change to bun.lock or to the Bun version in package.json's
     # packageManager needs a new hash here. The failing build prints it after
     # "got:".
-    outputHash = "sha256-LRzsxn+LNPP5lER1IHP3fkIvnfGRSqvCdEDERTkcNQw=";
+    outputHash = "sha256-LEejCwJNt39s9RcS6ynYsHv+jvgdxIBwfYhn7Z8R5oE=";
     outputHashAlgo = "sha256";
     outputHashMode = "recursive";
     impureEnvVars = lib.fetchers.proxyImpureEnvVars;
