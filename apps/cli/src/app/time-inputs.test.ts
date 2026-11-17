@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { DateTime, Effect } from 'effect';
+import { TestClock } from 'effect/testing';
 import { type Bound, parseTakenAt, parseTime } from './time-inputs.ts';
 
 const parse = (value: string, bound: Bound = 'start', zone = 'Europe/Berlin') =>
@@ -49,6 +50,25 @@ describe('parseTime', () => {
     expect(parsed).toBeGreaterThanOrEqual(before - threeDays - 1000);
     expect(parsed).toBeLessThanOrEqual(Date.now() - threeDays);
   });
+
+  it.each([
+    ['2026-03-30T10:00:00.000Z', '3d', '2026-03-27T10:00:00.000Z'],
+    ['2026-10-26T10:00:00.000Z', '1w', '2026-10-19T10:00:00.000Z'],
+  ])(
+    'at %s reads %s across a daylight saving change as %s',
+    async (now, value, expected) => {
+      const parsed = await Effect.runPromise(
+        Effect.gen(function* () {
+          yield* TestClock.setTime(Date.parse(now));
+          return yield* parseTime('from', value, 'start');
+        }).pipe(
+          Effect.provide(TestClock.layer()),
+          Effect.provide(DateTime.layerCurrentZoneNamed('Europe/Berlin')),
+        ),
+      );
+      expect(parsed).toBe(expected);
+    },
+  );
 
   it.each([
     '2026-02-30',

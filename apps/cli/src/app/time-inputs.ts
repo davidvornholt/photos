@@ -34,10 +34,12 @@ const ago = (text: string) =>
       return Option.none<DateTime.DateTime>();
     }
     const unit = units[groups.unit as keyof typeof units];
-    const now = yield* DateTime.nowInCurrentZone;
-    return Option.some<DateTime.DateTime>(
-      DateTime.subtract(now, { [unit]: Number(groups.amount) }),
-    );
+    // Subtract in UTC: in a zone, 3d across a change to or from daylight
+    // saving time would be 71 or 73 hours.
+    const then = DateTime.subtract(yield* DateTime.now, {
+      [unit]: Number(groups.amount),
+    });
+    return Option.some<DateTime.DateTime>(yield* DateTime.setZoneCurrent(then));
   });
 
 type WallClock = {
