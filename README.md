@@ -2,7 +2,7 @@
 
 > Built on [davidvornholt/standards](https://github.com/davidvornholt/standards).
 
-`photos` is a command-line tool for AI agents to find, look at, download, upload, organize, and share the photos and videos in an [Immich](https://immich.app) library. An agent can find the photos you just took on your phone and look at them without you downloading anything, search by what photos show, the text in them, or the people in them, sort photos into albums, tags, stacks, and memories, name people and fix their faces, crop and rotate photos, share albums and links, and move temporary scans or duplicates to the trash. It talks to Immich's REST API with an API key and prints JSON.
+`photos` is a command-line tool for AI agents to find, look at, download, upload, organize, and share the photos and videos in an [Immich](https://immich.app) library. An agent can find the photos you just took on your phone and look at them without you downloading anything, search by what photos show, the text in them, or the people in them, sort photos into albums, tags, stacks, and memories, name people and fix their faces, crop and rotate photos, correct when they were taken, share albums and links, and move temporary scans or duplicates to the trash. It talks to Immich's REST API with an API key and prints JSON.
 
 photos can't delete photos or videos for good. Deleting moves them to Immich's trash, which keeps them for 30 days by default, and `photos restore` brings them back. It never prints GPS coordinates, and the previews it saves for an agent to look at are Immich's re-encoded thumbnails without camera metadata. Shared links expire after 7 days and show no metadata and allow no downloads unless asked.
 

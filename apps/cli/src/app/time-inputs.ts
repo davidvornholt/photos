@@ -31,14 +31,12 @@ const ago = (text: string) =>
   Effect.gen(function* () {
     const groups = relativePattern.exec(text)?.groups;
     if (groups === undefined) {
-      return Option.none<string>();
+      return Option.none<DateTime.DateTime>();
     }
     const unit = units[groups.unit as keyof typeof units];
-    const now = yield* DateTime.now;
-    return Option.some(
-      DateTime.formatIso(
-        DateTime.subtract(now, { [unit]: Number(groups.amount) }),
-      ),
+    const now = yield* DateTime.nowInCurrentZone;
+    return Option.some<DateTime.DateTime>(
+      DateTime.subtract(now, { [unit]: Number(groups.amount) }),
     );
   });
 
@@ -88,27 +86,25 @@ const local = (parts: WallClock, bound: Bound) =>
       return made.day === parts.day && made.month === parts.month;
     });
     if (!exists || Option.isNone(zoned)) {
-      return Option.none<string>();
+      return Option.none<DateTime.DateTime>();
     }
     const wholeDay = !hasTime && bound === 'end';
-    return Option.some(
-      DateTime.formatIso(
-        wholeDay
-          ? DateTime.subtract(DateTime.add(zoned.value, { days: 1 }), {
-              milliseconds: 1,
-            })
-          : zoned.value,
-      ),
+    return Option.some<DateTime.DateTime>(
+      wholeDay
+        ? DateTime.subtract(DateTime.add(zoned.value, { days: 1 }), {
+            milliseconds: 1,
+          })
+        : zoned.value,
     );
   });
 
 /**
- * The ISO instant a person means by a time: an age before now, a day or a
- * wall-clock time in this machine's time zone, or an instant with an offset.
- * As the end of a range, a bare day means its last moment, so
- * `--to 2026-11-14` includes that whole day.
+ * The moment a person means by a time: an age before now, a day or a
+ * wall-clock time in this machine's time zone, or an instant, which keeps the
+ * offset it was given with. As the end of a range, a bare day means its last
+ * moment, so `--to 2026-11-14` includes that whole day.
  */
-export const parseTime = (flag: string, value: string, bound: Bound) =>
+const readTime = (flag: string, value: string, bound: Bound) =>
   Effect.gen(function* () {
     const text = value.trim();
     const relative = yield* ago(text);
@@ -116,7 +112,11 @@ export const parseTime = (flag: string, value: string, bound: Bound) =>
       return relative.value;
     }
     const parsed = instantPattern.test(text)
-      ? Option.map(DateTime.make(text), DateTime.formatIso)
+      ? Option.orElse(
+          DateTime.makeZonedFromString(text),
+          // makeZonedFromString refuses Z, which is UTC.
+          (): Option.Option<DateTime.DateTime> => DateTime.make(text),
+        )
       : yield* Option.match(wallClockParts(text), {
           onNone: () => Effect.succeedNone,
           onSome: (parts) => local(parts, bound),
@@ -126,6 +126,18 @@ export const parseTime = (flag: string, value: string, bound: Bound) =>
     }
     return parsed.value;
   });
+
+/** The ISO instant in UTC a person means by a time, as described at `readTime`. */
+export const parseTime = (flag: string, value: string, bound: Bound) =>
+  Effect.map(readTime(flag, value, bound), DateTime.formatIso);
+
+/**
+ * When a photo was taken, as an ISO time with its offset. Immich shows a photo
+ * at the wall-clock time of the offset it is given, so a photo set to noon in
+ * Berlin as a UTC instant would show at 11:00. A bare day means its start.
+ */
+export const parseTakenAt = (flag: string, value: string) =>
+  Effect.map(readTime(flag, value, 'start'), DateTime.formatIsoOffset);
 
 /** Parses an optional time flag. */
 export const optionalTime = (

@@ -18,8 +18,39 @@ import {
   validIds,
 } from './command-inputs.ts';
 import { runImmich } from './root.ts';
+import { parseTakenAt } from './time-inputs.ts';
 
 const maxRating = 5;
+
+// Immich applies a new time taken in the background, usually within seconds,
+// so update looks again for up to about 15 seconds before printing.
+const takenAtChecks = 30;
+const takenAtCheckInterval = '500 millis';
+// Immich may store the time to the second only.
+const takenAtTolerance = 1000;
+
+/**
+ * The photos as they are now; with a new time taken, once Immich shows it on
+ * all of them or the checks run out.
+ */
+const changedAssets = (ids: ReadonlyArray<string>, takenAt?: string) =>
+  Effect.gen(function* () {
+    const wanted = takenAt === undefined ? undefined : Date.parse(takenAt);
+    for (let check = 1; ; check += 1) {
+      const assets = yield* getAssets(ids);
+      const settled =
+        wanted === undefined ||
+        assets.every(
+          (asset) =>
+            Math.abs(Date.parse(asset.fileCreatedAt) - wanted) <
+            takenAtTolerance,
+        );
+      if (settled || check === takenAtChecks) {
+        return assets;
+      }
+      yield* Effect.sleep(takenAtCheckInterval);
+    }
+  });
 
 /**
  * Immich's trash settings, or a failure while the trash is off: then Immich
@@ -129,6 +160,10 @@ export const update = Command.make(
       'rating',
       `Set the star rating, 1 to ${maxRating}; 0 clears it`,
     ),
+    takenAt: optionalString(
+      'taken-at',
+      "Set when the photo was taken: a day as YYYY-MM-DD or a time as YYYY-MM-DDTHH:MM in this machine's time zone, or an ISO time with an offset",
+    ),
   },
   (flags) =>
     runImmich(
@@ -140,6 +175,9 @@ export const update = Command.make(
               min: 0,
               max: maxRating,
             })
+          : undefined;
+        const takenAt = Option.isSome(flags.takenAt)
+          ? yield* parseTakenAt('taken-at', flags.takenAt.value)
           : undefined;
         const changes = {
           ...Option.match(flags.favorite, {
@@ -159,10 +197,11 @@ export const update = Command.make(
           ...(rating === undefined
             ? {}
             : { rating: rating === 0 ? null : rating }),
+          ...(takenAt === undefined ? {} : { dateTimeOriginal: takenAt }),
         };
         if (Object.keys(changes).length === 0) {
           return yield* fail(
-            'Nothing to change. Pass --favorite, --archived, --description or --rating, or their --no- forms.',
+            'Nothing to change. Pass --favorite, --archived, --description, --rating or --taken-at, or the --no- forms of the first two.',
           );
         }
         return { ids, changes };
@@ -175,12 +214,12 @@ export const update = Command.make(
             path: '/assets',
             body: { ids, ...changes },
           });
-          const updated = yield* getAssets(ids);
+          const updated = yield* changedAssets(ids, changes.dateTimeOriginal);
           return updated.map(summarize);
         }),
     ),
 ).pipe(
   Command.withDescription(
-    'Change the favorite mark, archive, description or rating of photos. Prints them as they are now.',
+    'Change the favorite mark, archive, description, rating or time taken of photos. Prints them as they are now.',
   ),
 );
