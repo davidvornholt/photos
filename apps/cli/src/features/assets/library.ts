@@ -1,4 +1,4 @@
-import { Effect, Schema } from 'effect';
+import { DateTime, Effect, Option, Schema } from 'effect';
 import { InvalidInput } from '../../shared/errors/errors.ts';
 import { requestJson } from '../../shared/immich.ts';
 import {
@@ -37,6 +37,43 @@ export const getAsset = (id: string) =>
 
 export const getAssets = (ids: ReadonlyArray<string>) =>
   Effect.forEach(ids, getAsset, { concurrency: lookupConcurrency });
+
+// Immich applies a new time taken in the background, usually within seconds.
+const takenAtChecks = 30;
+const takenAtCheckInterval = '500 millis';
+// Immich may store the time to the second only.
+const takenAtTolerance = 1000;
+
+/** Whether Immich shows the asset at the instant and wall-clock time of `takenAt`. */
+const isTakenAt = (takenAt: string) => {
+  const instant = Date.parse(takenAt);
+  // makeZonedFromString refuses Z, which is UTC and has no offset.
+  const offset = Option.match(DateTime.makeZonedFromString(takenAt), {
+    onNone: () => 0,
+    onSome: DateTime.zonedOffset,
+  });
+  const near = (time: string, wanted: number) =>
+    Math.abs(Date.parse(time) - wanted) < takenAtTolerance;
+  return (asset: Asset) =>
+    near(asset.fileCreatedAt, instant) &&
+    near(asset.localDateTime, instant + offset);
+};
+
+/**
+ * Looks up the assets once Immich shows all of them taken at `takenAt`, an
+ * ISO time with offset, or as they are after about 15 seconds.
+ */
+export const getAssetsTakenAt = (ids: ReadonlyArray<string>, takenAt: string) =>
+  Effect.gen(function* () {
+    const settled = isTakenAt(takenAt);
+    for (let check = 1; ; check += 1) {
+      const assets = yield* getAssets(ids);
+      if (assets.every(settled) || check === takenAtChecks) {
+        return assets;
+      }
+      yield* Effect.sleep(takenAtCheckInterval);
+    }
+  });
 
 /**
  * Runs a search and returns one page of results. Immich's `total` counts only

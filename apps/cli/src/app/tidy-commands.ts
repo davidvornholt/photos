@@ -5,7 +5,11 @@ import {
   ServerConfigSchema,
 } from '../features/account/account.ts';
 import { CountSchema, summarize } from '../features/assets/assets.ts';
-import { browsable, getAssets } from '../features/assets/library.ts';
+import {
+  browsable,
+  getAssets,
+  getAssetsTakenAt,
+} from '../features/assets/library.ts';
 import { TrashDisabled } from '../shared/errors/errors.ts';
 import { requestJson, requestNothing } from '../shared/immich.ts';
 import {
@@ -21,36 +25,6 @@ import { runImmich } from './root.ts';
 import { parseTakenAt } from './time-inputs.ts';
 
 const maxRating = 5;
-
-// Immich applies a new time taken in the background, usually within seconds,
-// so update looks again for up to about 15 seconds before printing.
-const takenAtChecks = 30;
-const takenAtCheckInterval = '500 millis';
-// Immich may store the time to the second only.
-const takenAtTolerance = 1000;
-
-/**
- * The photos as they are now; with a new time taken, once Immich shows it on
- * all of them or the checks run out.
- */
-const changedAssets = (ids: ReadonlyArray<string>, takenAt?: string) =>
-  Effect.gen(function* () {
-    const wanted = takenAt === undefined ? undefined : Date.parse(takenAt);
-    for (let check = 1; ; check += 1) {
-      const assets = yield* getAssets(ids);
-      const settled =
-        wanted === undefined ||
-        assets.every(
-          (asset) =>
-            Math.abs(Date.parse(asset.fileCreatedAt) - wanted) <
-            takenAtTolerance,
-        );
-      if (settled || check === takenAtChecks) {
-        return assets;
-      }
-      yield* Effect.sleep(takenAtCheckInterval);
-    }
-  });
 
 /**
  * Immich's trash settings, or a failure while the trash is off: then Immich
@@ -214,7 +188,9 @@ export const update = Command.make(
             path: '/assets',
             body: { ids, ...changes },
           });
-          const updated = yield* changedAssets(ids, changes.dateTimeOriginal);
+          const updated = yield* changes.dateTimeOriginal === undefined
+            ? getAssets(ids)
+            : getAssetsTakenAt(ids, changes.dateTimeOriginal);
           return updated.map(summarize);
         }),
     ),
