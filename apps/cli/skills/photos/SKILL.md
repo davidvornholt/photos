@@ -32,7 +32,7 @@ Run `photos --help` for commands and `photos <command> --help` for options. Outp
 
 ## Changing and tidying
 
-- Change the library only when the user asks. `update` sets the favorite mark, archives or unarchives, and sets the description, the rating (`--rating 0` clears it), or when the photo was taken (`--taken-at`, such as the day an old print was taken after you scanned it).
+- Change the library only when the user asks. `update` sets the favorite mark, archives or unarchives, and sets the description, the rating (`--rating 0` clears it), or when the photo was taken (`--taken-at`).
 - Albums: `photos albums list --name <text>`, `albums show <album>`, `albums create <name> [asset...]`, `albums add`, `albums remove`, and `albums update` for the name, description, or cover. Removing a photo from an album leaves it in the library.
 - Tags: `photos tags list`, `tags create <name>`, `tags update`, `tags add <tag> <asset...>`, and `tags remove`. Name a tag by its id or its full name; a slash puts it below another, as in `Trips/2026`.
 - Stacks group photos such as a burst, or a RAW file and its JPEG, so the timeline shows only the primary one: `photos stacks list [--asset <id>]`, `stacks show`, `stacks create <asset...>` (the first one given is the primary), `stacks update --primary`, and `stacks remove`. Check with `preview` that the photos belong together.

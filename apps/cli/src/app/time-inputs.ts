@@ -129,7 +129,6 @@ const readTime = (flag: string, value: string, bound: Bound) =>
     return parsed.value;
   });
 
-/** The ISO instant in UTC a person means by a time, as described at `readTime`. */
 export const parseTime = (flag: string, value: string, bound: Bound) =>
   Effect.map(readTime(flag, value, bound), DateTime.formatIso);
 
