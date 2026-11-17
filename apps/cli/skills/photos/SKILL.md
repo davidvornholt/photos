@@ -62,7 +62,7 @@ Run `photos --help` for commands and `photos <command> --help` for options. Outp
 
 Before any of these, show the user exactly what you picked, with names, file names, the times taken, and previews where they help to tell things apart. Then wait for their OK in this conversation. An OK covers only what you showed.
 
-- Moving photos to the trash: `trash` and `duplicates resolve`.
+- Moving photos to the trash: `trash` and `duplicates resolve`. A photo you uploaded in this conversation and then replaced with a corrected upload is the exception: trash it without asking, because the user asked for the result, not for two copies, and the trash keeps it.
 - Deleting or merging: `albums delete`, `tags delete`, `stacks delete`, `memories delete`, `people merge`, `people delete`, and `faces delete`. A merge and a deleted face cannot be undone.
 - Moving faces between named people, unless the user named both.
 - Sharing or stopping it: `albums share`, `albums unshare`, and every `links` command that changes something.
