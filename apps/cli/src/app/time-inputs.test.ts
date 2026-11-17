@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { DateTime, Effect } from 'effect';
-import { type Bound, parseTime } from './time-inputs.ts';
+import { TestClock } from 'effect/testing';
+import { type Bound, parseTakenAt, parseTime } from './time-inputs.ts';
 
 const parse = (value: string, bound: Bound = 'start', zone = 'Europe/Berlin') =>
   Effect.runPromise(
@@ -51,6 +52,25 @@ describe('parseTime', () => {
   });
 
   it.each([
+    ['2026-03-30T10:00:00.000Z', '3d', '2026-03-27T10:00:00.000Z'],
+    ['2026-10-26T10:00:00.000Z', '1w', '2026-10-19T10:00:00.000Z'],
+  ])(
+    'at %s reads %s across a daylight saving change as %s',
+    async (now, value, expected) => {
+      const parsed = await Effect.runPromise(
+        Effect.gen(function* () {
+          yield* TestClock.setTime(Date.parse(now));
+          return yield* parseTime('from', value, 'start');
+        }).pipe(
+          Effect.provide(TestClock.layer()),
+          Effect.provide(DateTime.layerCurrentZoneNamed('Europe/Berlin')),
+        ),
+      );
+      expect(parsed).toBe(expected);
+    },
+  );
+
+  it.each([
     '2026-02-30',
     '2026-13-01',
     '2026-11-14T24:00',
@@ -61,5 +81,37 @@ describe('parseTime', () => {
   ])('refuses %j', async (value) => {
     const result = await parse(value);
     expect(result._tag).toBe('Failure');
+  });
+});
+
+// Berlin is an hour ahead of UTC in winter and two in summer.
+const berlinOffset = /[+]0[12]:00$/u;
+
+describe('parseTakenAt', () => {
+  const takenAt = async (value: string) => {
+    const result = await Effect.runPromise(
+      parseTakenAt('taken-at', value).pipe(
+        Effect.provide(DateTime.layerCurrentZoneNamed('Europe/Berlin')),
+        Effect.result,
+      ),
+    );
+    if (result._tag === 'Failure') {
+      throw new Error(result.failure.message);
+    }
+    return result.success;
+  };
+
+  it.each([
+    ['2024-11-01', '2024-11-01T00:00:00.000+01:00'],
+    ['2024-07-01T12:00', '2024-07-01T12:00:00.000+02:00'],
+    ['2024-11-01T12:00:00-05:00', '2024-11-01T12:00:00.000-05:00'],
+    ['2024-11-01T12:00+0530', '2024-11-01T12:00:00.000+05:30'],
+    ['2024-11-01T12:00:00Z', '2024-11-01T12:00:00.000Z'],
+  ])('keeps the offset of %s as %s', async (value, expected) => {
+    expect(await takenAt(value)).toBe(expected);
+  });
+
+  it('reads an age in the time zone of the machine', async () => {
+    expect(await takenAt('3d')).toMatch(berlinOffset);
   });
 });

@@ -5,7 +5,11 @@ import {
   ServerConfigSchema,
 } from '../features/account/account.ts';
 import { CountSchema, summarize } from '../features/assets/assets.ts';
-import { browsable, getAssets } from '../features/assets/library.ts';
+import {
+  browsable,
+  getAssets,
+  getAssetsTakenAt,
+} from '../features/assets/library.ts';
 import { TrashDisabled } from '../shared/errors/errors.ts';
 import { requestJson, requestNothing } from '../shared/immich.ts';
 import {
@@ -18,6 +22,7 @@ import {
   validIds,
 } from './command-inputs.ts';
 import { runImmich } from './root.ts';
+import { parseTakenAt } from './time-inputs.ts';
 
 const maxRating = 5;
 
@@ -129,6 +134,10 @@ export const update = Command.make(
       'rating',
       `Set the star rating, 1 to ${maxRating}; 0 clears it`,
     ),
+    takenAt: optionalString(
+      'taken-at',
+      "Set when the photo was taken: a day as YYYY-MM-DD or a time as YYYY-MM-DDTHH:MM in this machine's time zone, or an ISO time with an offset",
+    ),
   },
   (flags) =>
     runImmich(
@@ -140,6 +149,9 @@ export const update = Command.make(
               min: 0,
               max: maxRating,
             })
+          : undefined;
+        const takenAt = Option.isSome(flags.takenAt)
+          ? yield* parseTakenAt('taken-at', flags.takenAt.value)
           : undefined;
         const changes = {
           ...Option.match(flags.favorite, {
@@ -159,10 +171,11 @@ export const update = Command.make(
           ...(rating === undefined
             ? {}
             : { rating: rating === 0 ? null : rating }),
+          ...(takenAt === undefined ? {} : { dateTimeOriginal: takenAt }),
         };
         if (Object.keys(changes).length === 0) {
           return yield* fail(
-            'Nothing to change. Pass --favorite, --archived, --description or --rating, or their --no- forms.',
+            'Nothing to change. Pass --favorite, --archived, --description, --rating or --taken-at, or the --no- forms of the first two.',
           );
         }
         return { ids, changes };
@@ -175,12 +188,14 @@ export const update = Command.make(
             path: '/assets',
             body: { ids, ...changes },
           });
-          const updated = yield* getAssets(ids);
+          const updated = yield* changes.dateTimeOriginal === undefined
+            ? getAssets(ids)
+            : getAssetsTakenAt(ids, changes.dateTimeOriginal);
           return updated.map(summarize);
         }),
     ),
 ).pipe(
   Command.withDescription(
-    'Change the favorite mark, archive, description or rating of photos. Prints them as they are now.',
+    'Change the favorite mark, archive, description, rating or time taken of photos. Prints them as they are now.',
   ),
 );

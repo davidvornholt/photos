@@ -144,9 +144,79 @@ describe('photos update', () => {
     });
   });
 
-  it.each([[[]], [['--rating', '6']]])('refuses %j', async (args) => {
-    const failure = await failureOf('update', id(1), ...args);
-    expect(failure._tag).toBe('InvalidInput');
-    expect(fake.sent).toEqual([]);
+  it.each([[[]], [['--rating', '6']], [['--taken-at', 'last autumn']]])(
+    'refuses %j',
+    async (args) => {
+      const failure = await failureOf('update', id(1), ...args);
+      expect(failure._tag).toBe('InvalidInput');
+      expect(fake.sent).toEqual([]);
+    },
+  );
+});
+
+describe('photos update --taken-at', () => {
+  it('sets the time taken with its offset and waits until Immich shows it', async () => {
+    let lookups = 0;
+    respond({
+      [`GET /api/assets/${id(1)}`]: () => {
+        lookups += 1;
+        // Immich applies the new time in the background, after the PUT.
+        return Response.json(
+          lookups < 3
+            ? asset(id(1))
+            : asset(id(1), {
+                fileCreatedAt: '2024-11-01T11:00:00.000Z',
+                localDateTime: '2024-11-01T12:00:00.000Z',
+              }),
+        );
+      },
+      'PUT /api/assets': null,
+    });
+    const output = await runOk(
+      'update',
+      id(1),
+      '--taken-at',
+      '2024-11-01T12:00',
+    );
+    expect(requests()).toContainEqual({
+      'PUT /api/assets': {
+        ids: [id(1)],
+        dateTimeOriginal: '2024-11-01T12:00:00.000+01:00',
+      },
+    });
+    expect(lookups).toBe(3);
+    expect(output).toEqual([
+      expect.objectContaining({ takenAt: '2024-11-01T12:00:00.000+01:00' }),
+    ]);
+  });
+
+  it('waits for the new wall-clock time when only the offset changes', async () => {
+    let lookups = 0;
+    respond({
+      [`GET /api/assets/${id(1)}`]: () => {
+        lookups += 1;
+        // The same instant, first shown as 11:00 UTC, then as noon in Berlin.
+        return Response.json(
+          asset(id(1), {
+            fileCreatedAt: '2024-11-01T11:00:00.000Z',
+            localDateTime:
+              lookups < 3
+                ? '2024-11-01T11:00:00.000Z'
+                : '2024-11-01T12:00:00.000Z',
+          }),
+        );
+      },
+      'PUT /api/assets': null,
+    });
+    const output = await runOk(
+      'update',
+      id(1),
+      '--taken-at',
+      '2024-11-01T12:00',
+    );
+    expect(lookups).toBe(3);
+    expect(output).toEqual([
+      expect.objectContaining({ takenAt: '2024-11-01T12:00:00.000+01:00' }),
+    ]);
   });
 });
